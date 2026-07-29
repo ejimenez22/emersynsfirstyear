@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Emersyn's First Year</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- Opening screen -->
+    <section id="openingScreen" class="screen active">
+        <div class="opening-background"></div>
+
+        <div class="opening-content">
+            <p class="eyebrow">A First Year Film</p>
+
+            <h1>Emersyn</h1>
+
+            <p class="subtitle">Our First Year Together</p>
+
+            <p class="dates">
+                August 5, 2025 — August 5, 2026
+            </p>
+
+            <button id="startButton" type="button">
+                Begin the Journey
+            </button>
+        </div>
+    </section>
+
+    <!-- Film -->
+    <main id="filmScreen" class="screen">
+
+        <div id="mediaStage">
+
+            <img
+                id="photoElement"
+                class="media-element"
+                src=""
+                alt="A memory from Emersyn's first year"
+            >
+
+            <video
+                id="videoElement"
+                class="media-element"
+                playsinline
+                preload="metadata"
+            ></video>
+
+            <div class="vignette"></div>
+            <div class="film-grain"></div>
+        </div>
+
+        <div id="chapterCard" class="chapter-card">
+            <p id="chapterLabel"></p>
+            <h2 id="chapterTitle"></h2>
+        </div>
+
+        <div id="caption" class="caption"></div>
+
+        <button
+            id="soundButton"
+            class="sound-button"
+            type="button"
+            aria-label="Mute or unmute the music"
+        >
+            Sound On
+        </button>
+
+    </main>
+
+    <!-- Ending screen -->
+    <section id="endingScreen" class="screen">
+        <div class="ending-content">
+            <p class="eyebrow">365 Days of Loving You</p>
+
+            <h2>Happy First Birthday, Emersyn</h2>
+
+            <p>
+                You will always be our little girl.
+            </p>
+
+            <p class="signature">
+                Love, Mom &amp; Dad
+            </p>
+
+            <button id="replayButton" type="button">
+                Watch Again
+            </button>
+        </div>
+    </section>
+
+    <audio id="backgroundMusic" preload="auto">
+        <source src="music/song.mp3" type="audio/mpeg">
+    </audio>
+
+    <script src="script.js"></script>
+</body>
+</html>
