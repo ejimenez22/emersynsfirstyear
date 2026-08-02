@@ -47,6 +47,8 @@ const FINAL_PHOTO_MINIMUM = 9;
 
 const MIN_PHOTO_DURATION = 1.15;
 const MAX_PHOTO_DURATION = 2.75;
+const VIDEO_TRANSITION_OVERHEAD = 0.45;
+const TIMING_SAFETY_BUFFER = 8;
 
 
 let timeline = [];
@@ -54,9 +56,13 @@ let currentIndex = 0;
 
 let currentTimeout = null;
 let videoTimeout = null;
+let videoStartTimeout = null;
+let filmEndTimeout = null;
 
 let filmRunning = false;
 let endingStarted = false;
+let videoFinishing = false;
+let songHasEnded = false;
 
 let activePhotoLayer = photoLayerOne;
 let inactivePhotoLayer = photoLayerTwo;
@@ -82,7 +88,7 @@ function initialize() {
     videoLayer.addEventListener("ended", finishVideo);
     videoLayer.addEventListener("error", handleVideoError);
 
-    backgroundMusic.addEventListener("ended", finishMainFilm);
+    backgroundMusic.addEventListener("ended", handleSongEnded);
 }
 
 
@@ -148,11 +154,17 @@ function buildTimeline() {
     const finaleVideoBudget =
         cakeVideo ? CAKE_VIDEO_DURATION : 0;
 
+    const videoTransitionBudget =
+        (regularVideoCount + (cakeVideo ? 1 : 0)) *
+        VIDEO_TRANSITION_OVERHEAD;
+
     const reservedDuration =
         openingDuration +
         regularVideoBudget +
         finaleVideoBudget +
-        FINAL_PHOTO_MINIMUM;
+        FINAL_PHOTO_MINIMUM +
+        videoTransitionBudget +
+        TIMING_SAFETY_BUFFER;
 
     const remainingPhotoTime = Math.max(
         allRegularPhotos.length * MIN_PHOTO_DURATION,
@@ -447,33 +459,113 @@ function showImage(item) {
 function showVideo(item) {
     clearTimeout(currentTimeout);
     clearTimeout(videoTimeout);
+    clearTimeout(videoStartTimeout);
+
+    videoFinishing = false;
 
     activePhotoLayer.classList.remove("visible");
     inactivePhotoLayer.classList.remove("visible");
 
     videoLayer.pause();
+    videoLayer.classList.remove("visible");
+
+    /*
+        Muted inline video is the most reliable way to allow
+        automatic playback on iPhone, Android, and mobile Chrome.
+        The main song continues underneath the clip.
+    */
+    videoLayer.muted = true;
+    videoLayer.defaultMuted = true;
+    videoLayer.playsInline = true;
+    videoLayer.setAttribute("muted", "");
+    videoLayer.setAttribute("playsinline", "");
+    videoLayer.setAttribute("webkit-playsinline", "");
+
     videoLayer.src = item.src;
     videoLayer.currentTime = 0;
-    videoLayer.muted = false;
+    backgroundMusic.volume = NORMAL_MUSIC_VOLUME;
 
-    backgroundMusic.volume = VIDEO_MUSIC_VOLUME;
-
+    videoLayer.load();
     videoLayer.classList.add("visible");
 
-    videoLayer.play().then(() => {
-        videoTimeout = window.setTimeout(
-            finishVideo,
-            item.duration * 1000
+    let playbackStarted = false;
+    let retryCount = 0;
+
+    const beginPlayback = () => {
+        if (
+            playbackStarted ||
+            videoFinishing ||
+            videoLayer.src === ""
+        ) {
+            return;
+        }
+
+        videoLayer.play()
+            .then(() => {
+                playbackStarted = true;
+
+                videoTimeout = window.setTimeout(
+                    finishVideo,
+                    item.duration * 1000
+                );
+            })
+            .catch((error) => {
+                retryCount += 1;
+
+                if (retryCount <= 2) {
+                    videoStartTimeout = window.setTimeout(
+                        beginPlayback,
+                        500
+                    );
+                    return;
+                }
+
+                console.warn(
+                    "Video could not play:",
+                    item.src,
+                    error
+                );
+
+                handleVideoError();
+            });
+    };
+
+    if (videoLayer.readyState >= 2) {
+        beginPlayback();
+    } else {
+        videoLayer.addEventListener(
+            "loadeddata",
+            beginPlayback,
+            { once: true }
         );
-    }).catch((error) => {
-        console.warn("Video could not play:", error);
-        handleVideoError();
-    });
+
+        videoLayer.addEventListener(
+            "canplay",
+            beginPlayback,
+            { once: true }
+        );
+
+        /*
+            Fallback in case a mobile browser does not fire
+            either readiness event promptly.
+        */
+        videoStartTimeout = window.setTimeout(
+            beginPlayback,
+            1200
+        );
+    }
 }
 
 
 function finishVideo() {
+    if (videoFinishing) {
+        return;
+    }
+
+    videoFinishing = true;
+
     clearTimeout(videoTimeout);
+    clearTimeout(videoStartTimeout);
 
     videoLayer.classList.remove("visible");
 
@@ -486,11 +578,19 @@ function finishVideo() {
 
 
 function handleVideoError() {
+    if (videoFinishing) {
+        return;
+    }
+
+    videoFinishing = true;
+
+    clearTimeout(videoTimeout);
+    clearTimeout(videoStartTimeout);
+
     stopVideo();
     restoreMusicVolume();
     moveNext();
 }
-
 
 function moveNext() {
     clearTimeout(currentTimeout);
@@ -507,30 +607,70 @@ function moveNext() {
 
 function holdFinalPhotoUntilSongEnds() {
     restoreMusicVolume();
+    clearTimeout(currentTimeout);
+    clearTimeout(filmEndTimeout);
 
-    const remainingMusic =
-        Math.max(
-            0,
-            backgroundMusic.duration -
-            backgroundMusic.currentTime
-        );
-
+    /*
+        Never end the film merely because the song ended early.
+        The cake video and final portrait must always be shown.
+    */
     if (
-        Number.isFinite(remainingMusic) &&
-        remainingMusic > 0
+        songHasEnded ||
+        backgroundMusic.ended ||
+        backgroundMusic.paused
     ) {
         currentTimeout = window.setTimeout(
             finishMainFilm,
-            remainingMusic * 1000
+            FINAL_PHOTO_MINIMUM * 1000
         );
+        return;
     }
+
+    const remainingMusic = Math.max(
+        0,
+        SONG_DURATION - (backgroundMusic.currentTime || 0)
+    );
+
+    currentTimeout = window.setTimeout(
+        finishMainFilm,
+        Math.max(
+            FINAL_PHOTO_MINIMUM,
+            remainingMusic
+        ) * 1000
+    );
+}
+
+
+function handleSongEnded() {
+    /*
+        Mark the song as finished, but allow the visual timeline
+        to continue through the cake video and final portrait.
+    */
+    songHasEnded = true;
 }
 
 
 function holdUntilSongEnds() {
-    if (backgroundMusic.ended || backgroundMusic.paused) {
+    clearTimeout(filmEndTimeout);
+
+    if (
+        songHasEnded ||
+        backgroundMusic.ended ||
+        backgroundMusic.paused
+    ) {
         finishMainFilm();
+        return;
     }
+
+    const remainingMusic = Math.max(
+        0,
+        SONG_DURATION - (backgroundMusic.currentTime || 0)
+    );
+
+    currentTimeout = window.setTimeout(
+        finishMainFilm,
+        Math.max(0.5, remainingMusic) * 1000
+    );
 }
 
 
@@ -543,6 +683,7 @@ function finishMainFilm() {
     filmRunning = false;
 
     clearAllTimers();
+    clearTimeout(filmEndTimeout);
     stopVideo();
 
     activePhotoLayer.classList.remove("visible");
@@ -631,7 +772,10 @@ function resetFilm() {
     filmRunning = false;
     endingStarted = false;
     firstPhotoShown = false;
+    videoFinishing = false;
+    songHasEnded = false;
 
+    clearTimeout(filmEndTimeout);
     stopVideo();
 
     dedicationScene.classList.remove("hidden");
@@ -667,16 +811,16 @@ function resetFilm() {
 
 function stopVideo() {
     clearTimeout(videoTimeout);
+    clearTimeout(videoStartTimeout);
 
     videoLayer.pause();
     videoLayer.classList.remove("visible");
 
-    if (videoLayer.getAttribute("src")) {
-        videoLayer.removeAttribute("src");
-        videoLayer.load();
-    }
-}
+    videoLayer.removeAttribute("src");
+    videoLayer.load();
 
+    videoFinishing = false;
+}
 
 function restoreMusicVolume() {
     backgroundMusic.volume = NORMAL_MUSIC_VOLUME;
@@ -725,6 +869,12 @@ function swapPhotoLayers() {
 function clearAllTimers() {
     clearTimeout(currentTimeout);
     clearTimeout(videoTimeout);
+    clearTimeout(videoStartTimeout);
+}
+
+
+function scheduleGuaranteedEnding() {
+    /* Deprecated in V3.3: the final portrait now controls ending. */
 }
 
 
