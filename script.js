@@ -24,78 +24,297 @@ const replayBackground = document.getElementById("replayBackground");
 const beginButton = document.getElementById("beginButton");
 const replayButton = document.getElementById("replayButton");
 
+const loadingArea = document.querySelector(".loading-area");
+const loadingStatus = document.getElementById("loadingStatus");
+const loadingBar = document.getElementById("loadingBar");
+
 const backgroundMusic = document.getElementById("backgroundMusic");
 
-
-/* ---------------------------------------
+/* --------------------------------------------------
    FILM SETTINGS
---------------------------------------- */
+-------------------------------------------------- */
 
-const SONG_DURATION = 219;
+const FALLBACK_SONG_DURATION = 219;
 
 const NORMAL_MUSIC_VOLUME = 0.78;
-const VIDEO_MUSIC_VOLUME = 0.16;
+const VIDEO_MUSIC_VOLUME = 0.14;
 
 const OPENING_BLACK_TIME = 2.6;
 const DEDICATION_LINE_TIME = 2.5;
-const DEDICATION_FADE_GAP = 0.8;
+const DEDICATION_GAP = 0.8;
 
-const REGULAR_VIDEO_MAX = 6;
+const REGULAR_VIDEO_DURATION = 6;
 const CAKE_VIDEO_DURATION = 9;
+const FINAL_PHOTO_DURATION = 14;
 
-const FINAL_PHOTO_MINIMUM = 9;
+const PRELOAD_CONCURRENCY = 4;
+const VIDEO_SYNC_TOLERANCE = 0.25;
 
-const REGULAR_PHOTO_DURATION = 1.82;
-const VIDEO_TRANSITION_OVERHEAD = 0.45;
+/* --------------------------------------------------
+   STATE
+-------------------------------------------------- */
 
-
-let timeline = [];
-let currentIndex = 0;
-
-let currentTimeout = null;
-let videoTimeout = null;
-let videoStartTimeout = null;
-let filmEndTimeout = null;
+let assetsReady = false;
+let loadingInProgress = false;
 
 let filmRunning = false;
 let endingStarted = false;
-let videoFinishing = false;
-let songHasEnded = false;
+let firstPhotoShown = false;
+
+let songDuration = FALLBACK_SONG_DURATION;
+
+let schedule = [];
+let activeScheduleIndex = -1;
+
+let animationFrameId = null;
+let currentTimeout = null;
 
 let activePhotoLayer = photoLayerOne;
 let inactivePhotoLayer = photoLayerTwo;
 
-let firstPhotoShown = false;
 let finalPhotoSource = "";
 
+const assetUrls = new Map();
 
-/* ---------------------------------------
+/* --------------------------------------------------
    INITIALIZE
---------------------------------------- */
+-------------------------------------------------- */
 
 initialize();
 
 function initialize() {
-    buildTimeline();
-
-    backgroundMusic.volume = NORMAL_MUSIC_VOLUME;
-
-    beginButton.addEventListener("click", beginFilm);
+    beginButton.addEventListener("click", handleBeginButton);
     replayButton.addEventListener("click", replayFilm);
 
-    videoLayer.addEventListener("ended", finishVideo);
-    videoLayer.addEventListener("error", handleVideoError);
+    backgroundMusic.addEventListener("ended", finishMainFilm);
 
-    backgroundMusic.addEventListener("ended", handleSongEnded);
+    preloadAllAssets();
 }
 
+/* --------------------------------------------------
+   MEDIA COLLECTION
+-------------------------------------------------- */
 
-/* ---------------------------------------
-   BUILD TIMELINE
---------------------------------------- */
+function getAllPhotos() {
+    return [
+        ...(mediaLibrary.photos.birth || []),
+        ...(mediaLibrary.photos.comingHome || []),
+        ...(mediaLibrary.photos.newbornDays || []),
+        ...(mediaLibrary.photos.growingUp || []),
+        ...(mediaLibrary.photos.ending || [])
+    ];
+}
 
-function buildTimeline() {
-    timeline = [];
+function getAllVideos() {
+    return [
+        ...(mediaLibrary.videos.birth || []),
+        ...(mediaLibrary.videos.comingHome || []),
+        ...(mediaLibrary.videos.growingUp || [])
+    ];
+}
+
+/* --------------------------------------------------
+   PRELOADING
+-------------------------------------------------- */
+
+async function preloadAllAssets() {
+    if (loadingInProgress) {
+        return;
+    }
+
+    loadingInProgress = true;
+    assetsReady = false;
+
+    beginButton.disabled = true;
+    beginButton.textContent = "Loading...";
+
+    loadingArea.classList.remove("hidden");
+    loadingStatus.textContent = "Preparing your memories...";
+    loadingBar.style.width = "0%";
+
+    const songSource = backgroundMusic.dataset.src;
+
+ const assets = [
+    {
+        src: songSource,
+        kind: "audio"
+    },
+
+    ...getAllPhotos().map((src) => ({
+        src,
+        kind: "image"
+    }))
+];
+
+    let completed = 0;
+
+    const updateProgress = () => {
+        completed += 1;
+
+        const percent = Math.round(
+            (completed / assets.length) * 100
+        );
+
+        loadingBar.style.width = `${percent}%`;
+        loadingStatus.textContent =
+            `Preparing your memories... ${percent}%`;
+    };
+
+    try {
+        await runWithConcurrency(
+            assets,
+            PRELOAD_CONCURRENCY,
+            async (asset) => {
+                const response = await fetch(
+                    encodeURI(asset.src),
+                    {
+                        cache: "force-cache"
+                    }
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        `Could not load ${asset.src} (${response.status})`
+                    );
+                }
+
+                const blob = await response.blob();
+                const objectUrl = URL.createObjectURL(blob);
+
+                assetUrls.set(asset.src, objectUrl);
+
+                updateProgress();
+            }
+        );
+
+        backgroundMusic.src = getAssetUrl(songSource);
+        backgroundMusic.load();
+
+        await waitForMetadata(backgroundMusic);
+
+        if (
+            Number.isFinite(backgroundMusic.duration) &&
+            backgroundMusic.duration > 0
+        ) {
+            songDuration = backgroundMusic.duration;
+        }
+
+        buildSchedule();
+
+        assetsReady = true;
+        loadingInProgress = false;
+
+        loadingStatus.textContent = "Ready";
+        loadingBar.style.width = "100%";
+
+        window.setTimeout(() => {
+            loadingArea.classList.add("hidden");
+        }, 500);
+
+        beginButton.disabled = false;
+        beginButton.textContent = "Begin";
+    } catch (error) {
+        console.error(error);
+
+        loadingInProgress = false;
+        assetsReady = false;
+
+        loadingStatus.textContent =
+            "Some memories could not be loaded.";
+
+        beginButton.disabled = false;
+        beginButton.textContent = "Retry";
+    }
+}
+
+async function runWithConcurrency(
+    items,
+    concurrency,
+    worker
+) {
+    let nextIndex = 0;
+
+    async function runWorker() {
+        while (nextIndex < items.length) {
+            const itemIndex = nextIndex;
+            nextIndex += 1;
+
+            await worker(items[itemIndex]);
+        }
+    }
+
+    const workers = Array.from(
+        {
+            length: Math.min(concurrency, items.length)
+        },
+        runWorker
+    );
+
+    await Promise.all(workers);
+}
+
+function waitForMetadata(mediaElement) {
+    return new Promise((resolve, reject) => {
+        if (
+            mediaElement.readyState >= 1 &&
+            Number.isFinite(mediaElement.duration)
+        ) {
+            resolve();
+            return;
+        }
+
+        const handleLoaded = () => {
+            cleanup();
+            resolve();
+        };
+
+        const handleError = () => {
+            cleanup();
+            reject(
+                new Error("The song metadata could not be loaded.")
+            );
+        };
+
+        const cleanup = () => {
+            mediaElement.removeEventListener(
+                "loadedmetadata",
+                handleLoaded
+            );
+
+            mediaElement.removeEventListener(
+                "error",
+                handleError
+            );
+        };
+
+        mediaElement.addEventListener(
+            "loadedmetadata",
+            handleLoaded,
+            {
+                once: true
+            }
+        );
+
+        mediaElement.addEventListener(
+            "error",
+            handleError,
+            {
+                once: true
+            }
+        );
+    });
+}
+
+function getAssetUrl(originalSource) {
+    return assetUrls.get(originalSource) || originalSource;
+}
+
+/* --------------------------------------------------
+   BUILD AUDIO-CLOCK SCHEDULE
+-------------------------------------------------- */
+
+function buildSchedule() {
+    schedule = [];
 
     const birthPhotos = mediaLibrary.photos.birth || [];
     const birthVideos = mediaLibrary.videos.birth || [];
@@ -124,72 +343,129 @@ function buildTimeline() {
     finalPhotoSource =
         endingPhotos[endingPhotos.length - 1] || "";
 
-    replayBackground.style.backgroundImage =
-        finalPhotoSource
-            ? `url("${encodeURI(finalPhotoSource)}")`
-            : "none";
+    if (finalPhotoSource) {
+        replayBackground.style.backgroundImage =
+            `url("${getAssetUrl(finalPhotoSource)}")`;
+    }
 
-    /*
-        V3.4 deliberately does not calculate photo timing from the song.
-        Every visual item is allowed to complete, even if the music ends first.
-    */
-    const photoDuration = REGULAR_PHOTO_DURATION;
+    const regularSequence = [];
 
     appendMediaGroup(
+        regularSequence,
         birthPhotos,
-        birthVideos,
-        photoDuration
+        birthVideos
     );
 
     appendMediaGroup(
+        regularSequence,
         comingHomePhotos,
-        comingHomeVideos,
-        photoDuration
+        comingHomeVideos
     );
 
     appendMediaGroup(
+        regularSequence,
         newbornPhotos,
-        [],
-        photoDuration
+        []
     );
 
     appendMediaGroup(
+        regularSequence,
         growingPhotos,
-        growingVideos,
-        photoDuration
+        growingVideos
     );
+
+    const openingDuration =
+        OPENING_BLACK_TIME +
+        DEDICATION_LINE_TIME +
+        DEDICATION_GAP +
+        DEDICATION_LINE_TIME +
+        DEDICATION_GAP;
+
+    const regularPhotoCount = regularSequence.filter(
+        (item) => item.type === "image"
+    ).length;
+
+    const regularVideoCount = regularSequence.filter(
+        (item) => item.type === "video"
+    ).length;
+
+    const regularVideoBudget =
+        regularVideoCount * REGULAR_VIDEO_DURATION;
+
+    const cakeBudget = cakeVideo
+        ? CAKE_VIDEO_DURATION
+        : 0;
+
+    const availablePhotoTime =
+        songDuration -
+        openingDuration -
+        regularVideoBudget -
+        cakeBudget -
+        FINAL_PHOTO_DURATION;
+
+    const regularPhotoDuration =
+        regularPhotoCount > 0
+            ? Math.max(
+                0.8,
+                availablePhotoTime / regularPhotoCount
+            )
+            : 0;
+
+    let cursor = openingDuration;
+
+    regularSequence.forEach((item) => {
+        const duration =
+            item.type === "video"
+                ? REGULAR_VIDEO_DURATION
+                : regularPhotoDuration;
+
+        schedule.push({
+            ...item,
+            start: cursor,
+            end: cursor + duration,
+            duration
+        });
+
+        cursor += duration;
+    });
 
     if (cakeVideo) {
-        timeline.push({
+        schedule.push({
             type: "video",
             src: cakeVideo,
-            duration: CAKE_VIDEO_DURATION,
-            cakeVideo: true
+            cakeVideo: true,
+            start: cursor,
+            end: cursor + CAKE_VIDEO_DURATION,
+            duration: CAKE_VIDEO_DURATION
         });
+
+        cursor += CAKE_VIDEO_DURATION;
     }
 
     if (finalPhotoSource) {
-        timeline.push({
+        schedule.push({
             type: "image",
             src: finalPhotoSource,
-            duration: FINAL_PHOTO_MINIMUM,
-            finalPhoto: true
+            finalPhoto: true,
+            start: cursor,
+            end: songDuration,
+            duration: Math.max(
+                0,
+                songDuration - cursor
+            )
         });
     }
 
     console.log({
-    photoDuration,
-    timelineItems: timeline.length,
-    finalPhotoSource
-});
+        songDuration,
+        openingDuration,
+        regularPhotoDuration,
+        regularVideoCount,
+        schedule
+    });
 }
 
-
-function appendMediaGroup(
-    photos,
-    videos,
-    photoDuration
-) {
+function appendMediaGroup(target, photos, videos) {
     if (!photos.length && !videos.length) {
         return;
     }
@@ -201,21 +477,19 @@ function appendMediaGroup(
 
     let videoIndex = 0;
 
-    photos.forEach((photo, photoIndex) => {
-        timeline.push({
+    photos.forEach((photoSource, photoIndex) => {
+        target.push({
             type: "image",
-            src: photo,
-            duration: photoDuration
+            src: photoSource
         });
 
         while (
             videoIndex < videos.length &&
             videoPositions[videoIndex] === photoIndex
         ) {
-            timeline.push({
+            target.push({
                 type: "video",
-                src: videos[videoIndex],
-                duration: REGULAR_VIDEO_MAX
+                src: videos[videoIndex]
             });
 
             videoIndex += 1;
@@ -223,21 +497,16 @@ function appendMediaGroup(
     });
 
     while (videoIndex < videos.length) {
-        timeline.push({
+        target.push({
             type: "video",
-            src: videos[videoIndex],
-            duration: REGULAR_VIDEO_MAX
+            src: videos[videoIndex]
         });
 
         videoIndex += 1;
     }
 }
 
-
-function calculateVideoPositions(
-    photoCount,
-    videoCount
-) {
+function calculateVideoPositions(photoCount, videoCount) {
     if (!videoCount) {
         return [];
     }
@@ -267,18 +536,18 @@ function calculateVideoPositions(
     return positions;
 }
 
+/* --------------------------------------------------
+   BEGIN
+-------------------------------------------------- */
 
-function clamp(value, minimum, maximum) {
-    return Math.min(
-        Math.max(value, minimum),
-        maximum
-    );
+function handleBeginButton() {
+    if (!assetsReady) {
+        preloadAllAssets();
+        return;
+    }
+
+    beginFilm();
 }
-
-
-/* ---------------------------------------
-   START
---------------------------------------- */
 
 async function beginFilm() {
     if (filmRunning) {
@@ -288,6 +557,7 @@ async function beginFilm() {
     resetFilm();
 
     filmRunning = true;
+    endingStarted = false;
 
     switchScreen(openingScreen, filmScreen);
 
@@ -297,70 +567,117 @@ async function beginFilm() {
 
         await backgroundMusic.play();
     } catch (error) {
-        console.warn("Music could not begin:", error);
+        console.error("The song could not begin:", error);
+        filmRunning = false;
+        return;
     }
 
     requestFullscreenSafely();
 
-    currentTimeout = window.setTimeout(
-        playDedication,
-        OPENING_BLACK_TIME * 1000
-    );
+    animationFrameId =
+        requestAnimationFrame(updateFilmFromAudioClock);
 }
 
+/* --------------------------------------------------
+   AUDIO-CLOCK PLAYER
+-------------------------------------------------- */
 
-function playDedication() {
-    dedicationLineOne.classList.add("visible");
-
-    currentTimeout = window.setTimeout(() => {
-        dedicationLineOne.classList.remove("visible");
-
-        currentTimeout = window.setTimeout(() => {
-            dedicationLineTwo.classList.add("visible");
-
-            currentTimeout = window.setTimeout(() => {
-                dedicationLineTwo.classList.remove("visible");
-
-                currentTimeout = window.setTimeout(() => {
-                    dedicationScene.classList.add("hidden");
-                    playCurrentItem();
-                }, DEDICATION_FADE_GAP * 1000);
-
-            }, DEDICATION_LINE_TIME * 1000);
-
-        }, DEDICATION_FADE_GAP * 1000);
-
-    }, DEDICATION_LINE_TIME * 1000);
-}
-
-
-/* ---------------------------------------
-   PLAYER
---------------------------------------- */
-
-function playCurrentItem() {
-    clearTimeout(currentTimeout);
-
-    const item = timeline[currentIndex];
-
-    if (!item) {
-        holdUntilSongEnds();
+function updateFilmFromAudioClock() {
+    if (!filmRunning) {
         return;
     }
 
+    const currentTime = backgroundMusic.currentTime;
+
+    updateDedication(currentTime);
+
+    const nextIndex = findScheduleIndex(currentTime);
+
+    if (
+        nextIndex !== activeScheduleIndex &&
+        nextIndex >= 0
+    ) {
+        activeScheduleIndex = nextIndex;
+        showScheduledItem(schedule[nextIndex], currentTime);
+    }
+
+    if (
+        currentTime >= songDuration - 0.05 ||
+        backgroundMusic.ended
+    ) {
+        finishMainFilm();
+        return;
+    }
+
+    animationFrameId =
+        requestAnimationFrame(updateFilmFromAudioClock);
+}
+
+function findScheduleIndex(currentTime) {
+    for (
+        let index = 0;
+        index < schedule.length;
+        index += 1
+    ) {
+        const item = schedule[index];
+
+        if (
+            currentTime >= item.start &&
+            currentTime < item.end
+        ) {
+            return index;
+        }
+    }
+
+    return -1;
+}
+
+/* --------------------------------------------------
+   DEDICATION
+-------------------------------------------------- */
+
+function updateDedication(currentTime) {
+    const lineOneStart = OPENING_BLACK_TIME;
+    const lineOneEnd =
+        lineOneStart + DEDICATION_LINE_TIME;
+
+    const lineTwoStart =
+        lineOneEnd + DEDICATION_GAP;
+
+    const lineTwoEnd =
+        lineTwoStart + DEDICATION_LINE_TIME;
+
+    dedicationLineOne.classList.toggle(
+        "visible",
+        currentTime >= lineOneStart &&
+        currentTime < lineOneEnd
+    );
+
+    dedicationLineTwo.classList.toggle(
+        "visible",
+        currentTime >= lineTwoStart &&
+        currentTime < lineTwoEnd
+    );
+
+    if (currentTime >= lineTwoEnd + DEDICATION_GAP) {
+        dedicationScene.classList.add("hidden");
+    }
+}
+
+/* --------------------------------------------------
+   DISPLAY ITEMS
+-------------------------------------------------- */
+
+function showScheduledItem(item, currentTime) {
     if (item.type === "image") {
         showImage(item);
         return;
     }
 
     if (item.type === "video") {
-        showVideo(item);
-        return;
+        showVideo(item, currentTime);
     }
-
-    moveNext();
 }
-
 
 function showImage(item) {
     stopVideo();
@@ -370,7 +687,7 @@ function showImage(item) {
     inactivePhotoLayer.onerror = null;
 
     inactivePhotoLayer.className = "photo-layer";
-    inactivePhotoLayer.src = item.src;
+    inactivePhotoLayer.src = getAssetUrl(item.src);
 
     if (!firstPhotoShown) {
         inactivePhotoLayer.classList.add("first-photo");
@@ -387,209 +704,78 @@ function showImage(item) {
         activePhotoLayer.classList.remove("visible");
 
         swapPhotoLayers();
-
         firstPhotoShown = true;
-
-        if (item.finalPhoto) {
-            holdFinalPhotoUntilSongEnds();
-            return;
-        }
-
-        currentTimeout = window.setTimeout(
-            moveNext,
-            item.duration * 1000
-        );
     };
 
     inactivePhotoLayer.onerror = () => {
-        console.warn("Image could not load:", item.src);
-        moveNext();
+        console.error("Image could not display:", item.src);
     };
 }
 
-
-function showVideo(item) {
-    clearTimeout(currentTimeout);
-    clearTimeout(videoTimeout);
-    clearTimeout(videoStartTimeout);
-
-    videoFinishing = false;
-
+function showVideo(item, currentTime) {
     activePhotoLayer.classList.remove("visible");
     inactivePhotoLayer.classList.remove("visible");
 
-    videoLayer.pause();
-    videoLayer.classList.remove("visible");
+    const expectedOffset = Math.max(
+        0,
+        currentTime - item.start
+    );
 
-    /*
-        Muted inline video is the most reliable way to allow
-        automatic playback on iPhone, Android, and mobile Chrome.
-        The main song continues underneath the clip.
-    */
-    videoLayer.muted = true;
-    videoLayer.defaultMuted = true;
-    videoLayer.playsInline = true;
-    videoLayer.setAttribute("muted", "");
-    videoLayer.setAttribute("playsinline", "");
-    videoLayer.setAttribute("webkit-playsinline", "");
+    if (
+        videoLayer.dataset.originalSource !==
+        item.src
+    ) {
+        videoLayer.pause();
 
-    videoLayer.src = item.src;
-    videoLayer.currentTime = 0;
+        videoLayer.src = encodeURI(item.src);
+        videoLayer.dataset.originalSource = item.src;
+
+        videoLayer.muted = true;
+        videoLayer.defaultMuted = true;
+        videoLayer.playsInline = true;
+
+        videoLayer.addEventListener(
+            "loadedmetadata",
+            () => {
+                const maximumOffset = Math.max(
+                    0,
+                    videoLayer.duration - 0.15
+                );
+
+                videoLayer.currentTime = Math.min(
+                    expectedOffset,
+                    maximumOffset
+                );
+
+                videoLayer.play().catch((error) => {
+                    console.error(
+                        "Video could not play:",
+                        item.src,
+                        error
+                    );
+                });
+            },
+            { once: true }
+        );
+    }
+
+    videoLayer.classList.add("visible");
     backgroundMusic.volume = NORMAL_MUSIC_VOLUME;
 
-    videoLayer.load();
-    videoLayer.classList.add("visible");
-
-    let playbackStarted = false;
-    let retryCount = 0;
-
-    const beginPlayback = () => {
-        if (
-            playbackStarted ||
-            videoFinishing ||
-            videoLayer.src === ""
-        ) {
-            return;
-        }
-
-        videoLayer.play()
-            .then(() => {
-                playbackStarted = true;
-
-                videoTimeout = window.setTimeout(
-                    finishVideo,
-                    item.duration * 1000
-                );
-            })
-            .catch((error) => {
-                retryCount += 1;
-
-                if (retryCount <= 2) {
-                    videoStartTimeout = window.setTimeout(
-                        beginPlayback,
-                        500
-                    );
-                    return;
-                }
-
-                console.warn(
-                    "Video could not play:",
-                    item.src,
-                    error
-                );
-
-                handleVideoError();
-            });
-    };
-
     if (videoLayer.readyState >= 2) {
-        beginPlayback();
-    } else {
-        videoLayer.addEventListener(
-            "loadeddata",
-            beginPlayback,
-            { once: true }
-        );
-
-        videoLayer.addEventListener(
-            "canplay",
-            beginPlayback,
-            { once: true }
-        );
-
-        /*
-            Fallback in case a mobile browser does not fire
-            either readiness event promptly.
-        */
-        videoStartTimeout = window.setTimeout(
-            beginPlayback,
-            1200
-        );
+        videoLayer.play().catch((error) => {
+            console.error(
+                "Video could not play:",
+                item.src,
+                error
+            );
+        });
     }
 }
 
-
-function finishVideo() {
-    if (videoFinishing) {
-        return;
-    }
-
-    videoFinishing = true;
-
-    clearTimeout(videoTimeout);
-    clearTimeout(videoStartTimeout);
-
-    videoLayer.classList.remove("visible");
-
-    window.setTimeout(() => {
-        stopVideo();
-        restoreMusicVolume();
-        moveNext();
-    }, 450);
-}
-
-
-function handleVideoError() {
-    if (videoFinishing) {
-        return;
-    }
-
-    videoFinishing = true;
-
-    clearTimeout(videoTimeout);
-    clearTimeout(videoStartTimeout);
-
-    stopVideo();
-    restoreMusicVolume();
-    moveNext();
-}
-
-function moveNext() {
-    clearTimeout(currentTimeout);
-    clearTimeout(videoTimeout);
-
-    currentIndex += 1;
-    playCurrentItem();
-}
-
-
-/* ---------------------------------------
-   FINAL PHOTO / SONG END
---------------------------------------- */
-
-function holdFinalPhotoUntilSongEnds() {
-    restoreMusicVolume();
-    clearTimeout(currentTimeout);
-    clearTimeout(filmEndTimeout);
-
-    /*
-        The final portrait controls the ending. It always remains visible
-        for the full minimum duration, regardless of the song state.
-    */
-    currentTimeout = window.setTimeout(
-        finishMainFilm,
-        FINAL_PHOTO_MINIMUM * 1000
-    );
-}
-
-
-function handleSongEnded() {
-    /*
-        Mark the song as finished, but allow the visual timeline
-        to continue through the cake video and final portrait.
-    */
-    songHasEnded = true;
-}
-
-
-function holdUntilSongEnds() {
-    /*
-        The timeline—not the audio—determines when the ending begins.
-        This fallback is used only if no final portrait exists.
-    */
-    finishMainFilm();
-}
-
+/* --------------------------------------------------
+   ENDING
+-------------------------------------------------- */
 
 function finishMainFilm() {
     if (!filmRunning || endingStarted) {
@@ -599,11 +785,9 @@ function finishMainFilm() {
     endingStarted = true;
     filmRunning = false;
 
-    clearAllTimers();
-    clearTimeout(filmEndTimeout);
-    stopVideo();
+    cancelAnimationFrame(animationFrameId);
 
-    backgroundMusic.pause();
+    stopVideo();
 
     activePhotoLayer.classList.remove("visible");
     inactivePhotoLayer.classList.remove("visible");
@@ -614,30 +798,25 @@ function finishMainFilm() {
 
         window.setTimeout(
             playEndingMessage,
-            1000
+            900
         );
-    }, 1100);
+    }, 900);
 }
-
-
-/* ---------------------------------------
-   ENDING MESSAGE
---------------------------------------- */
 
 function playEndingMessage() {
     endingIntro.classList.add("visible");
 
     window.setTimeout(() => {
         endingName.classList.add("visible");
-    }, 1100);
+    }, 1000);
 
     window.setTimeout(() => {
         endingMessage.classList.add("visible");
-    }, 2600);
+    }, 2500);
 
     window.setTimeout(() => {
         endingLove.classList.add("visible");
-    }, 4300);
+    }, 4200);
 
     window.setTimeout(() => {
         endingText.style.opacity = "0";
@@ -645,22 +824,16 @@ function playEndingMessage() {
         window.setTimeout(() => {
             endingText.style.display = "none";
             replayScene.classList.add("visible");
-        }, 1500);
-
-    }, 8500);
+        }, 1400);
+    }, 8200);
 }
 
-
-/* ---------------------------------------
+/* --------------------------------------------------
    REPLAY
---------------------------------------- */
+-------------------------------------------------- */
 
 function replayFilm() {
     resetFilm();
-
-    replayScene.classList.remove("visible");
-    endingText.style.display = "block";
-    endingText.style.opacity = "1";
 
     switchScreen(endingScreen, filmScreen);
 
@@ -669,32 +842,32 @@ function replayFilm() {
     backgroundMusic.currentTime = 0;
     backgroundMusic.volume = NORMAL_MUSIC_VOLUME;
 
-    backgroundMusic.play().catch((error) => {
-        console.warn("Music could not restart:", error);
+    backgroundMusic.play().then(() => {
+        animationFrameId =
+            requestAnimationFrame(
+                updateFilmFromAudioClock
+            );
+    }).catch((error) => {
+        console.error(
+            "The song could not restart:",
+            error
+        );
     });
-
-    currentTimeout = window.setTimeout(
-        playDedication,
-        OPENING_BLACK_TIME * 1000
-    );
 }
 
-
-/* ---------------------------------------
-   HELPERS
---------------------------------------- */
+/* --------------------------------------------------
+   RESET AND HELPERS
+-------------------------------------------------- */
 
 function resetFilm() {
-    clearAllTimers();
+    cancelAnimationFrame(animationFrameId);
+    clearTimeout(currentTimeout);
 
-    currentIndex = 0;
-    filmRunning = false;
-    endingStarted = false;
+    activeScheduleIndex = -1;
     firstPhotoShown = false;
-    videoFinishing = false;
-    songHasEnded = false;
+    endingStarted = false;
+    filmRunning = false;
 
-    clearTimeout(filmEndTimeout);
     stopVideo();
 
     dedicationScene.classList.remove("hidden");
@@ -727,36 +900,25 @@ function resetFilm() {
     backgroundMusic.volume = NORMAL_MUSIC_VOLUME;
 }
 
-
 function stopVideo() {
-    clearTimeout(videoTimeout);
-    clearTimeout(videoStartTimeout);
-
     videoLayer.pause();
     videoLayer.classList.remove("visible");
 
     videoLayer.removeAttribute("src");
+    videoLayer.removeAttribute("data-original-source");
     videoLayer.load();
-
-    videoFinishing = false;
 }
 
 function restoreMusicVolume() {
     backgroundMusic.volume = NORMAL_MUSIC_VOLUME;
 }
 
+function setBlurredBackground(originalSource) {
+    blurredBackground.style.backgroundImage =
+        `url("${getAssetUrl(originalSource)}")`;
 
-function setBlurredBackground(src) {
-    blurredBackground.classList.remove("visible");
-
-    window.setTimeout(() => {
-        blurredBackground.style.backgroundImage =
-            `url("${encodeURI(src)}")`;
-
-        blurredBackground.classList.add("visible");
-    }, 80);
+    blurredBackground.classList.add("visible");
 }
-
 
 function applyRandomMotion(element) {
     const motions = [
@@ -766,33 +928,21 @@ function applyRandomMotion(element) {
         "motion-four"
     ];
 
-    const selected =
+    element.classList.add(
         motions[
             Math.floor(
                 Math.random() * motions.length
             )
-        ];
-
-    element.classList.add(selected);
+        ]
+    );
 }
-
 
 function swapPhotoLayers() {
-    const oldActive = activePhotoLayer;
+    const previousActive = activePhotoLayer;
 
     activePhotoLayer = inactivePhotoLayer;
-    inactivePhotoLayer = oldActive;
+    inactivePhotoLayer = previousActive;
 }
-
-
-function clearAllTimers() {
-    clearTimeout(currentTimeout);
-    clearTimeout(videoTimeout);
-    clearTimeout(videoStartTimeout);
-}
-
-
-
 
 async function requestFullscreenSafely() {
     try {
@@ -809,7 +959,6 @@ async function requestFullscreenSafely() {
     }
 }
 
-
 function switchScreen(currentScreen, nextScreen) {
     currentScreen.classList.remove("active-screen");
 
@@ -820,5 +969,5 @@ function switchScreen(currentScreen, nextScreen) {
         requestAnimationFrame(() => {
             nextScreen.classList.add("active-screen");
         });
-    }, 850);
+    }, 750);
 }

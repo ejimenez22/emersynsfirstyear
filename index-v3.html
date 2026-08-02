@@ -12,57 +12,32 @@
 
     <title>Emersyn — Our First Year</title>
 
-    <link rel="stylesheet" href="style.css?v=4.3">
+    <link rel="stylesheet" href="style.css?v=3.4.2">
 </head>
 
 <body>
 
-    <!-- Opening screen -->
+    <!-- Opening -->
     <section id="openingScreen" class="screen active-screen">
-
         <div class="opening-content">
-
             <h1>Emersyn</h1>
 
-            <p class="opening-subtitle">
-                Our First Year
-            </p>
+            <p>Our First Year</p>
 
-            <div class="loading-area" aria-live="polite">
-
-                <p id="loadingStatus">
-                    Preparing your memories...
-                </p>
-
-                <div class="loading-track">
-                    <div id="loadingBar"></div>
-                </div>
-
-            </div>
-
-            <button
-                id="beginButton"
-                type="button"
-                disabled
-            >
-                Loading...
+            <button id="beginButton" type="button">
+                Begin
             </button>
 
-            <span class="sound-note">
-                Best experienced with sound
-            </span>
-
+            <span>Best experienced with sound</span>
         </div>
-
     </section>
 
 
-    <!-- Film screen -->
+    <!-- Film -->
     <main id="filmScreen" class="screen">
 
         <div id="mediaStage">
 
-            <!-- Blurred version of the current photo -->
             <div
                 id="blurredBackground"
                 class="blurred-background"
@@ -70,7 +45,6 @@
 
             <div class="background-shade"></div>
 
-            <!-- Two layers create photo crossfades -->
             <img
                 id="photoLayerOne"
                 class="photo-layer"
@@ -86,8 +60,10 @@
             <video
                 id="videoLayer"
                 class="video-layer"
-                playsinline
+                autoplay
                 muted
+                playsinline
+                webkit-playsinline
                 preload="auto"
             ></video>
 
@@ -97,7 +73,7 @@
         </div>
 
 
-        <!-- Dedication scene -->
+        <!-- Opening dedication after Begin -->
         <div id="dedicationScene" class="dedication-scene">
 
             <p id="dedicationLineOne">
@@ -113,7 +89,7 @@
     </main>
 
 
-    <!-- Ending -->
+    <!-- Ending message -->
     <section id="endingScreen" class="screen">
 
         <div id="endingText" class="ending-text">
@@ -136,8 +112,6 @@
 
         </div>
 
-
-        <!-- Final portrait and replay button -->
         <div id="replayScene" class="replay-scene">
 
             <div
@@ -156,17 +130,16 @@
     </section>
 
 
-    <!-- Song is assigned by JavaScript after preloading -->
-    <audio
-        id="backgroundMusic"
-        preload="none"
-        data-src="music/my-little-girl.m4a"
-    ></audio>
+    <audio id="backgroundMusic" preload="auto">
+        <source
+            src="music/my-little-girl.m4a"
+            type="audio/mp4"
+        >
+    </audio>
 
 
-    <!-- media.js must load before script.js -->
-    <script src="media.js?v=4.3"></script>
-    <script src="script.js?v=4.5"></script>
+    <script src="media.js?v=3.4"></script>
+    <script src="script.js?v=3.4.2"></script>
 
 </body>
 </html>
