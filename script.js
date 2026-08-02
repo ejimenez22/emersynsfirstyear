@@ -45,10 +45,8 @@ const CAKE_VIDEO_DURATION = 9;
 
 const FINAL_PHOTO_MINIMUM = 9;
 
-const MIN_PHOTO_DURATION = 1.15;
-const MAX_PHOTO_DURATION = 2.75;
+const REGULAR_PHOTO_DURATION = 1.82;
 const VIDEO_TRANSITION_OVERHEAD = 0.45;
-const TIMING_SAFETY_BUFFER = 8;
 
 
 let timeline = [];
@@ -131,56 +129,11 @@ function buildTimeline() {
             ? `url("${encodeURI(finalPhotoSource)}")`
             : "none";
 
-    const allRegularPhotos = [
-        ...birthPhotos,
-        ...comingHomePhotos,
-        ...newbornPhotos,
-        ...growingPhotos
-    ];
-
-    const regularVideoCount =
-        birthVideos.length +
-        comingHomeVideos.length +
-        growingVideos.length;
-
-    const openingDuration =
-        OPENING_BLACK_TIME +
-        (DEDICATION_LINE_TIME * 2) +
-        (DEDICATION_FADE_GAP * 3);
-
-    const regularVideoBudget =
-        regularVideoCount * REGULAR_VIDEO_MAX;
-
-    const finaleVideoBudget =
-        cakeVideo ? CAKE_VIDEO_DURATION : 0;
-
-    const videoTransitionBudget =
-        (regularVideoCount + (cakeVideo ? 1 : 0)) *
-        VIDEO_TRANSITION_OVERHEAD;
-
-    const reservedDuration =
-        openingDuration +
-        regularVideoBudget +
-        finaleVideoBudget +
-        FINAL_PHOTO_MINIMUM +
-        videoTransitionBudget +
-        TIMING_SAFETY_BUFFER;
-
-    const remainingPhotoTime = Math.max(
-        allRegularPhotos.length * MIN_PHOTO_DURATION,
-        SONG_DURATION - reservedDuration
-    );
-
-    const calculatedPhotoDuration =
-        allRegularPhotos.length
-            ? remainingPhotoTime / allRegularPhotos.length
-            : MIN_PHOTO_DURATION;
-
-    const photoDuration = clamp(
-        calculatedPhotoDuration,
-        MIN_PHOTO_DURATION,
-        MAX_PHOTO_DURATION
-    );
+    /*
+        V3.4 deliberately does not calculate photo timing from the song.
+        Every visual item is allowed to complete, even if the music ends first.
+    */
+    const photoDuration = REGULAR_PHOTO_DURATION;
 
     appendMediaGroup(
         birthPhotos,
@@ -225,11 +178,10 @@ function buildTimeline() {
     }
 
     console.log({
-        photoDuration,
-        timelineItems: timeline.length,
-        regularVideoCount,
-        finalPhotoSource
-    });
+    photoDuration,
+    timelineItems: timeline.length,
+    finalPhotoSource
+});
 }
 
 
@@ -611,32 +563,12 @@ function holdFinalPhotoUntilSongEnds() {
     clearTimeout(filmEndTimeout);
 
     /*
-        Never end the film merely because the song ended early.
-        The cake video and final portrait must always be shown.
+        The final portrait controls the ending. It always remains visible
+        for the full minimum duration, regardless of the song state.
     */
-    if (
-        songHasEnded ||
-        backgroundMusic.ended ||
-        backgroundMusic.paused
-    ) {
-        currentTimeout = window.setTimeout(
-            finishMainFilm,
-            FINAL_PHOTO_MINIMUM * 1000
-        );
-        return;
-    }
-
-    const remainingMusic = Math.max(
-        0,
-        SONG_DURATION - (backgroundMusic.currentTime || 0)
-    );
-
     currentTimeout = window.setTimeout(
         finishMainFilm,
-        Math.max(
-            FINAL_PHOTO_MINIMUM,
-            remainingMusic
-        ) * 1000
+        FINAL_PHOTO_MINIMUM * 1000
     );
 }
 
@@ -651,26 +583,11 @@ function handleSongEnded() {
 
 
 function holdUntilSongEnds() {
-    clearTimeout(filmEndTimeout);
-
-    if (
-        songHasEnded ||
-        backgroundMusic.ended ||
-        backgroundMusic.paused
-    ) {
-        finishMainFilm();
-        return;
-    }
-
-    const remainingMusic = Math.max(
-        0,
-        SONG_DURATION - (backgroundMusic.currentTime || 0)
-    );
-
-    currentTimeout = window.setTimeout(
-        finishMainFilm,
-        Math.max(0.5, remainingMusic) * 1000
-    );
+    /*
+        The timeline—not the audio—determines when the ending begins.
+        This fallback is used only if no final portrait exists.
+    */
+    finishMainFilm();
 }
 
 
@@ -685,6 +602,8 @@ function finishMainFilm() {
     clearAllTimers();
     clearTimeout(filmEndTimeout);
     stopVideo();
+
+    backgroundMusic.pause();
 
     activePhotoLayer.classList.remove("visible");
     inactivePhotoLayer.classList.remove("visible");
@@ -873,9 +792,6 @@ function clearAllTimers() {
 }
 
 
-function scheduleGuaranteedEnding() {
-    /* Deprecated in V3.3: the final portrait now controls ending. */
-}
 
 
 async function requestFullscreenSafely() {
