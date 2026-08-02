@@ -5,104 +5,138 @@
 
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0"
+        content="width=device-width, initial-scale=1, viewport-fit=cover"
     >
 
-    <title>Emersyn's First Year</title>
+    <meta name="theme-color" content="#000000">
+
+    <title>Emersyn — Our First Year</title>
 
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <!-- Opening screen -->
-    <section id="openingScreen" class="screen active">
-        <div class="opening-background"></div>
-
+    <!-- Opening -->
+    <section id="openingScreen" class="screen active-screen">
         <div class="opening-content">
-            <p class="eyebrow">A First Year Film</p>
-
             <h1>Emersyn</h1>
 
-            <p class="subtitle">Our First Year Together</p>
+            <p>Our First Year</p>
 
-            <p class="dates">
-                August 5, 2025 — August 5, 2026
-            </p>
-
-            <button id="startButton" type="button">
-                Begin the Journey
+            <button id="beginButton" type="button">
+                Begin
             </button>
+
+            <span>Best experienced with sound</span>
         </div>
     </section>
+
 
     <!-- Film -->
     <main id="filmScreen" class="screen">
 
         <div id="mediaStage">
 
+            <div
+                id="blurredBackground"
+                class="blurred-background"
+            ></div>
+
+            <div class="background-shade"></div>
+
             <img
-                id="photoElement"
-                class="media-element"
-                src=""
+                id="photoLayerOne"
+                class="photo-layer"
+                alt="A memory from Emersyn's first year"
+            >
+
+            <img
+                id="photoLayerTwo"
+                class="photo-layer"
                 alt="A memory from Emersyn's first year"
             >
 
             <video
-                id="videoElement"
-                class="media-element"
+                id="videoLayer"
+                class="video-layer"
                 playsinline
                 preload="metadata"
             ></video>
 
             <div class="vignette"></div>
             <div class="film-grain"></div>
+
         </div>
 
-        <div id="chapterCard" class="chapter-card">
-            <p id="chapterLabel"></p>
-            <h2 id="chapterTitle"></h2>
+
+        <!-- Opening dedication after Begin -->
+        <div id="dedicationScene" class="dedication-scene">
+
+            <p id="dedicationLineOne">
+                For Emersyn...
+            </p>
+
+            <p id="dedicationLineTwo">
+                Our little girl.
+            </p>
+
         </div>
-
-        <div id="caption" class="caption"></div>
-
-        <button
-            id="soundButton"
-            class="sound-button"
-            type="button"
-            aria-label="Mute or unmute the music"
-        >
-            Sound On
-        </button>
 
     </main>
 
-    <!-- Ending screen -->
+
+    <!-- Ending message -->
     <section id="endingScreen" class="screen">
-        <div class="ending-content">
-            <p class="eyebrow">365 Days of Loving You</p>
 
-            <h2>Happy First Birthday, Emersyn</h2>
+        <div id="endingText" class="ending-text">
 
-            <p>
-                You will always be our little girl.
+            <p class="ending-intro">
+                Happy First Birthday
             </p>
 
-            <p class="signature">
-                Love, Mom &amp; Dad
+            <h2>Emersyn</h2>
+
+            <p class="ending-message">
+                You'll always be our little girl.
             </p>
+
+            <p class="ending-love">
+                Love,
+                <br>
+                Mom, Dad, Clayton &amp; Jakob
+            </p>
+
+        </div>
+
+        <div id="replayScene" class="replay-scene">
+
+            <div
+                id="replayBackground"
+                class="replay-background"
+            ></div>
+
+            <div class="replay-shade"></div>
 
             <button id="replayButton" type="button">
                 Watch Again
             </button>
+
         </div>
+
     </section>
 
-    <audio id="backgroundMusic" preload="auto">
-    <source src="music/my-little-girl.m4a" type="audio/mp4">
-</audio>
 
-    <script src="timeline.js"></script>
+    <audio id="backgroundMusic" preload="auto">
+        <source
+            src="music/my-little-girl.m4a"
+            type="audio/mp4"
+        >
+    </audio>
+
+
+    <script src="media.js"></script>
     <script src="script.js"></script>
+
 </body>
 </html>

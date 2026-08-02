@@ -23,7 +23,7 @@ const timeline = [
 
     {
         type: "video",
-        src: "videos/01.mov",
+        src: "videos/01.mp4",
         caption: "Your very first cries.",
         pauseMusic: true
     }

@@ -1,8 +1,10 @@
 :root {
-    --background: #050505;
-    --text: #ffffff;
-    --soft-text: rgba(255, 255, 255, 0.72);
-    --accent: #e8d3be;
+    --black: #000000;
+    --white: #ffffff;
+    --soft-white: rgba(255, 255, 255, 0.72);
+    --faint-white: rgba(255, 255, 255, 0.46);
+    --warm-white: #ead8c5;
+    --crossfade: 1.25s;
 }
 
 * {
@@ -16,9 +18,14 @@ body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: var(--background);
-    color: var(--text);
+    background: var(--black);
+    color: var(--white);
+}
+
+body {
     font-family: Georgia, "Times New Roman", serif;
+    cursor: default;
+    overscroll-behavior: none;
 }
 
 button {
@@ -30,326 +37,439 @@ button {
     inset: 0;
     display: none;
     opacity: 0;
-    background: var(--background);
-    transition: opacity 1.5s ease;
+    overflow: hidden;
+    background: var(--black);
+    transition: opacity 1.2s ease;
 }
 
-.screen.active {
+.screen.active-screen {
     display: flex;
     opacity: 1;
 }
 
-/* Opening */
+
+/* ---------------------------------------
+   OPENING
+--------------------------------------- */
 
 #openingScreen {
     align-items: center;
     justify-content: center;
+    min-height: 100svh;
+    padding:
+        max(24px, env(safe-area-inset-top))
+        max(24px, env(safe-area-inset-right))
+        max(24px, env(safe-area-inset-bottom))
+        max(24px, env(safe-area-inset-left));
     text-align: center;
-    padding: 24px;
-}
-
-.opening-background {
-    position: absolute;
-    inset: 0;
-    background:
-        linear-gradient(
-            rgba(0, 0, 0, 0.38),
-            rgba(0, 0, 0, 0.78)
-        ),
-        url("images/01.jpg") center center / cover no-repeat;
-    transform: scale(1.05);
-    animation: openingZoom 18s ease-in-out infinite alternate;
 }
 
 .opening-content {
-    position: relative;
-    z-index: 2;
-    max-width: 800px;
-}
-
-.eyebrow {
-    margin-bottom: 18px;
-    color: var(--accent);
-    font-family: Arial, Helvetica, sans-serif;
-    font-size: 0.78rem;
-    letter-spacing: 0.3rem;
-    text-transform: uppercase;
+    width: min(100%, 900px);
 }
 
 .opening-content h1 {
-    font-size: clamp(4rem, 12vw, 9rem);
+    font-size: clamp(4.25rem, 15vw, 10rem);
     font-weight: 400;
-    line-height: 0.95;
-    letter-spacing: -0.04em;
+    line-height: 0.9;
+    letter-spacing: -0.045em;
 }
 
-.subtitle {
-    margin-top: 22px;
-    color: var(--soft-text);
-    font-size: clamp(1rem, 3vw, 1.45rem);
-    letter-spacing: 0.08em;
-}
-
-.dates {
-    margin-top: 12px;
-    color: rgba(255, 255, 255, 0.58);
+.opening-content > p {
+    margin-top: 28px;
+    color: var(--soft-white);
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 0.78rem;
-    letter-spacing: 0.12em;
+    font-size: clamp(0.85rem, 2.4vw, 1.2rem);
+    letter-spacing: 0.22em;
     text-transform: uppercase;
 }
 
-#startButton,
+#beginButton,
 #replayButton {
-    margin-top: 42px;
-    padding: 15px 30px;
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    margin-top: 44px;
+    padding: 14px 34px;
+    border: 1px solid rgba(255, 255, 255, 0.66);
     border-radius: 999px;
-    background: rgba(0, 0, 0, 0.22);
-    color: white;
+    background: transparent;
+    color: var(--white);
     cursor: pointer;
-    backdrop-filter: blur(8px);
     transition:
         background 0.3s ease,
         color 0.3s ease,
         transform 0.3s ease;
 }
 
-#startButton:hover,
+#beginButton:hover,
 #replayButton:hover {
-    background: white;
-    color: black;
+    background: var(--white);
+    color: var(--black);
     transform: translateY(-2px);
 }
 
-/* Film */
+.opening-content span {
+    display: block;
+    margin-top: 14px;
+    color: var(--faint-white);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+
+/* ---------------------------------------
+   FILM
+--------------------------------------- */
 
 #filmScreen {
-    background: black;
+    min-height: 100svh;
+    background: var(--black);
 }
 
 #mediaStage {
     position: absolute;
     inset: 0;
     overflow: hidden;
-    background: black;
+    background: var(--black);
 }
 
-.media-element {
+.blurred-background {
+    position: absolute;
+    inset: -10%;
+    z-index: 0;
+    opacity: 0;
+    background-position: center;
+    background-size: cover;
+    filter: blur(38px) brightness(0.7) saturate(0.9);
+    transform: scale(1.18);
+    transition: opacity var(--crossfade) ease;
+}
+
+.blurred-background.visible {
+    opacity: 0.72;
+}
+
+.background-shade {
     position: absolute;
     inset: 0;
-    width: 100%;
-    height: 100%;
-    display: none;
-    opacity: 0;
-    object-fit: cover;
-    transition: opacity 1.6s ease;
+    z-index: 1;
+    background:
+        linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.12),
+            rgba(0, 0, 0, 0.26)
+        );
 }
 
-.media-element.visible {
-    display: block;
+.photo-layer,
+.video-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    object-fit: contain;
+    object-position: center;
+    transition: opacity var(--crossfade) ease;
+}
+
+.photo-layer.visible,
+.video-layer.visible {
     opacity: 1;
 }
 
-#photoElement.zoom-one {
-    animation: zoomOne 8s ease-in-out forwards;
+.photo-layer {
+    will-change: opacity, transform;
 }
 
-#photoElement.zoom-two {
-    animation: zoomTwo 8s ease-in-out forwards;
+.photo-layer.motion-one {
+    animation: motionOne 5s ease-in-out forwards;
 }
 
-#photoElement.zoom-three {
-    animation: zoomThree 8s ease-in-out forwards;
+.photo-layer.motion-two {
+    animation: motionTwo 5s ease-in-out forwards;
+}
+
+.photo-layer.motion-three {
+    animation: motionThree 5s ease-in-out forwards;
+}
+
+.photo-layer.motion-four {
+    animation: motionFour 5s ease-in-out forwards;
+}
+
+.photo-layer.first-photo {
+    animation: firstPhotoMotion 7s ease-in-out forwards;
+}
+
+.photo-layer.final-photo {
+    animation: none;
+    transform: none;
+}
+
+.video-layer {
+    background: transparent;
 }
 
 .vignette {
     position: absolute;
     inset: 0;
-    z-index: 4;
+    z-index: 5;
     pointer-events: none;
     background:
         radial-gradient(
             circle at center,
-            transparent 48%,
-            rgba(0, 0, 0, 0.72) 120%
+            transparent 52%,
+            rgba(0, 0, 0, 0.58) 118%
         );
 }
 
 .film-grain {
     position: absolute;
-    inset: -50%;
-    z-index: 5;
+    inset: -45%;
+    z-index: 6;
+    opacity: 0.027;
     pointer-events: none;
-    opacity: 0.055;
     background-image:
         repeating-radial-gradient(
-            circle at 20% 30%,
-            rgba(255, 255, 255, 0.22) 0 1px,
-            transparent 1px 4px
+            circle at 25% 35%,
+            rgba(255, 255, 255, 0.25) 0 1px,
+            transparent 1px 5px
         );
-    animation: grainMove 0.3s steps(2) infinite;
+    animation: grainShift 0.3s steps(2) infinite;
 }
 
-.caption {
-    position: absolute;
-    z-index: 10;
-    left: 50%;
-    bottom: 7%;
-    width: min(90%, 900px);
-    opacity: 0;
-    color: white;
-    font-size: clamp(1.2rem, 4vw, 2.5rem);
-    letter-spacing: 0.04em;
-    text-align: center;
-    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.9);
-    transform: translate(-50%, 16px);
-    transition:
-        opacity 1s ease,
-        transform 1s ease;
-}
 
-.caption.visible {
-    opacity: 1;
-    transform: translate(-50%, 0);
-}
+/* ---------------------------------------
+   DEDICATION
+--------------------------------------- */
 
-.chapter-card {
+.dedication-scene {
     position: absolute;
     inset: 0;
-    z-index: 20;
+    z-index: 30;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    opacity: 0;
-    padding: 24px;
-    background: black;
+    background: var(--black);
     text-align: center;
     pointer-events: none;
-    transition: opacity 1.2s ease;
 }
 
-.chapter-card.visible {
+.dedication-scene p {
+    position: absolute;
+    opacity: 0;
+    padding: 24px;
+    color: var(--white);
+    font-size: clamp(2rem, 7vw, 5rem);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    transition: opacity 1.3s ease;
+}
+
+.dedication-scene p.visible {
     opacity: 1;
 }
 
-.chapter-card p {
-    margin-bottom: 12px;
-    color: var(--accent);
-    font-family: Arial, Helvetica, sans-serif;
-    font-size: 0.75rem;
-    letter-spacing: 0.3rem;
-    text-transform: uppercase;
+.dedication-scene.hidden {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+        opacity 1.2s ease,
+        visibility 1.2s ease;
 }
 
-.chapter-card h2 {
-    font-size: clamp(2.5rem, 9vw, 6rem);
-    font-weight: 400;
-}
 
-.sound-button {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    z-index: 30;
-    padding: 9px 14px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 999px;
-    background: rgba(0, 0, 0, 0.35);
-    color: white;
-    font-family: Arial, Helvetica, sans-serif;
-    font-size: 0.72rem;
-    cursor: pointer;
-    backdrop-filter: blur(8px);
-}
-
-/* Ending */
+/* ---------------------------------------
+   ENDING
+--------------------------------------- */
 
 #endingScreen {
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    min-height: 100svh;
+    padding:
+        max(28px, env(safe-area-inset-top))
+        max(24px, env(safe-area-inset-right))
+        max(28px, env(safe-area-inset-bottom))
+        max(24px, env(safe-area-inset-left));
     text-align: center;
 }
 
-.ending-content {
-    max-width: 760px;
+.ending-text {
+    position: relative;
+    z-index: 5;
+    width: min(100%, 900px);
 }
 
-.ending-content h2 {
-    font-size: clamp(2.5rem, 8vw, 6rem);
+.ending-text > * {
+    opacity: 0;
+    transform: translateY(12px);
+    transition:
+        opacity 1.3s ease,
+        transform 1.3s ease;
+}
+
+.ending-text > *.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.ending-intro {
+    color: var(--warm-white);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: clamp(0.85rem, 2.5vw, 1.15rem);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+}
+
+.ending-text h2 {
+    margin-top: 18px;
+    font-size: clamp(4rem, 14vw, 9rem);
     font-weight: 400;
-    line-height: 1.04;
+    line-height: 0.95;
 }
 
-.ending-content > p:not(.eyebrow) {
-    margin-top: 24px;
-    color: var(--soft-text);
-    font-size: clamp(1rem, 3vw, 1.35rem);
+.ending-message {
+    margin-top: 30px;
+    color: var(--soft-white);
+    font-size: clamp(1.1rem, 3.4vw, 1.65rem);
 }
 
-.signature {
+.ending-love {
+    margin-top: 28px;
+    color: rgba(255, 255, 255, 0.65);
+    font-size: clamp(1rem, 2.8vw, 1.3rem);
     font-style: italic;
+    line-height: 1.75;
 }
 
-/* Animations */
+.replay-scene {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    padding-bottom:
+        max(42px, env(safe-area-inset-bottom));
+    transition:
+        opacity 1.8s ease,
+        visibility 1.8s ease;
+}
 
-@keyframes openingZoom {
+.replay-scene.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.replay-background {
+    position: absolute;
+    inset: -5%;
+    background-position: center;
+    background-size: cover;
+    filter: blur(2px);
+    transform: scale(1.05);
+}
+
+.replay-shade {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.16),
+            rgba(0, 0, 0, 0.72)
+        );
+}
+
+#replayButton {
+    position: relative;
+    z-index: 3;
+    margin: 0;
+    background: rgba(0, 0, 0, 0.24);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+
+/* ---------------------------------------
+   ANIMATIONS
+--------------------------------------- */
+
+@keyframes firstPhotoMotion {
+    0% {
+        transform: scale(1);
+    }
+
+    18% {
+        transform: scale(1);
+    }
+
+    100% {
+        transform: scale(1.055);
+    }
+}
+
+@keyframes motionOne {
     from {
-        transform: scale(1.05);
+        transform: scale(1.015) translate(0, 0);
     }
 
     to {
-        transform: scale(1.14);
+        transform: scale(1.07) translate(-0.7%, -0.4%);
     }
 }
 
-@keyframes zoomOne {
+@keyframes motionTwo {
     from {
-        transform: scale(1.02) translate(0, 0);
+        transform: scale(1.07) translate(0.5%, 0);
     }
 
     to {
-        transform: scale(1.13) translate(-1.5%, -1%);
+        transform: scale(1.02) translate(-0.5%, 0.4%);
     }
 }
 
-@keyframes zoomTwo {
+@keyframes motionThree {
     from {
-        transform: scale(1.12) translate(1%, 0);
+        transform: scale(1.02) translate(-0.4%, 0.5%);
     }
 
     to {
-        transform: scale(1.02) translate(-1%, 1%);
+        transform: scale(1.075) translate(0.5%, -0.5%);
     }
 }
 
-@keyframes zoomThree {
+@keyframes motionFour {
     from {
-        transform: scale(1.03) translate(-1%, 1%);
+        transform: scale(1.06) translate(-0.4%, -0.2%);
     }
 
     to {
-        transform: scale(1.14) translate(1%, -1%);
+        transform: scale(1.015) translate(0.4%, 0.4%);
     }
 }
 
-@keyframes grainMove {
+@keyframes grainShift {
     0% {
         transform: translate(0, 0);
     }
 
     25% {
-        transform: translate(2%, -2%);
+        transform: translate(2%, -1%);
     }
 
     50% {
-        transform: translate(-2%, 1%);
+        transform: translate(-1%, 2%);
     }
 
     75% {
-        transform: translate(1%, 2%);
+        transform: translate(1%, 1%);
     }
 
     100% {
@@ -357,21 +477,21 @@ button {
     }
 }
 
+
+/* ---------------------------------------
+   MOBILE
+--------------------------------------- */
+
 @media (max-width: 700px) {
     .opening-content h1 {
-        font-size: clamp(3.7rem, 20vw, 6rem);
+        font-size: clamp(4rem, 21vw, 7rem);
     }
 
-    .caption {
-        bottom: 10%;
-        font-size: 1.35rem;
-    }
-
-    .sound-button {
-        top: 14px;
-        right: 14px;
+    .ending-text h2 {
+        font-size: clamp(4rem, 20vw, 7rem);
     }
 }
+
 
 @media (prefers-reduced-motion: reduce) {
     *,

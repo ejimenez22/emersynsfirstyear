@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover"
+    >
+
+    <meta name="theme-color" content="#000000">
+
+    <title>Emersyn's First Year</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- Opening screen -->
+    <section id="openingScreen" class="screen active-screen">
+
+        <div
+            id="openingBackground"
+            class="opening-background"
+        ></div>
+
+        <div class="dark-overlay"></div>
+
+        <div class="opening-content">
+
+            <p class="opening-dedication">
+                For Emersyn, our little girl.
+            </p>
+
+            <h1>Emersyn</h1>
+
+            <p class="opening-subtitle">
+                Our First Year
+            </p>
+
+            <p class="opening-dates">
+                August 5, 2025 — August 5, 2026
+            </p>
+
+            <button id="beginButton" type="button">
+                Begin the Journey
+            </button>
+
+            <p class="fullscreen-note">
+                Best experienced with sound
+            </p>
+
+        </div>
+
+    </section>
+
+
+    <!-- Main film -->
+    <main id="filmScreen" class="screen">
+
+        <div id="mediaStage">
+
+            <!-- Blurred background -->
+            <div
+                id="blurredBackground"
+                class="blurred-background"
+            ></div>
+
+            <div class="background-shade"></div>
+
+            <!-- Two photo layers allow crossfades -->
+            <img
+                id="photoLayerOne"
+                class="photo-layer"
+                src=""
+                alt="A memory from Emersyn's first year"
+            >
+
+            <img
+                id="photoLayerTwo"
+                class="photo-layer"
+                src=""
+                alt="A memory from Emersyn's first year"
+            >
+
+            <!-- Video layer -->
+            <video
+                id="videoLayer"
+                class="video-layer"
+                playsinline
+                preload="metadata"
+            ></video>
+
+            <div class="vignette"></div>
+            <div class="film-grain"></div>
+
+        </div>
+
+
+        <!-- Opening dedication shown after the button -->
+        <div id="dedicationCard" class="text-card">
+            <p>For Emersyn,</p>
+            <h2>Our little girl.</h2>
+        </div>
+
+
+        <!-- Subtle section labels -->
+        <div id="sectionLabel" class="section-label"></div>
+
+
+        <!-- Controls -->
+        <div id="filmControls" class="film-controls">
+
+            <button
+                id="soundButton"
+                class="control-button"
+                type="button"
+                aria-label="Mute or unmute the film"
+            >
+                Sound On
+            </button>
+
+            <button
+                id="fullscreenButton"
+                class="control-button"
+                type="button"
+            >
+                Full Screen
+            </button>
+
+        </div>
+
+    </main>
+
+
+    <!-- Ending screen -->
+    <section id="endingScreen" class="screen">
+
+        <div class="ending-content">
+
+            <p class="ending-small">
+                365 days of loving you
+            </p>
+
+            <h2>
+                Happy First Birthday,
+                <span>Emersyn</span>
+            </h2>
+
+            <p class="ending-message">
+                You'll always be our little girl.
+            </p>
+
+            <p class="ending-signature">
+                Love,<br>
+                Mom, Dad, Clayton &amp; Jakob
+            </p>
+
+            <button id="replayButton" type="button">
+                Watch Again
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <audio id="backgroundMusic" preload="auto">
+        <source
+            src="music/my-little-girl.m4a"
+            type="audio/mp4"
+        >
+    </audio>
+
+
+    <!-- media.js must load before script.js -->
+    <script src="media.js"></script>
+    <script src="script.js"></script>
+
+</body>
+</html>
